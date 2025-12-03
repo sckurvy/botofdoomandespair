@@ -1,9 +1,7 @@
-// Load environment variables from Render (or local .env)
 require("dotenv").config();
-
 const { Client, GatewayIntentBits } = require("discord.js");
+const express = require("express");
 
-// Create a new Discord client
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -12,14 +10,34 @@ const client = new Client({
     ]
 });
 
-// Event: Bot ready
 client.once("ready", () => {
     console.log(`Logged in as ${client.user.tag}`);
+
+    // Start Express server only after bot is ready
+    const app = express();
+    app.use(express.json());
+
+    app.post("/send", async (req, res) => {
+        const { channelId, content } = req.body;
+        try {
+            const channel = await client.channels.fetch(channelId);
+            if (!channel) return res.status(404).send("Channel not found");
+
+            await channel.send(content);
+            res.send("Message sent successfully");
+        } catch (err) {
+            console.error(err);
+            res.status(500).send("Failed to send message");
+        }
+    });
+
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log(`API server running on port ${PORT}`);
+    });
 });
 
-// Event: Message received
 client.on("messageCreate", (message) => {
-    // Ignore messages from bots
     if (message.author.bot) return;
 
     if (message.content === "!ping") {
@@ -27,10 +45,9 @@ client.on("messageCreate", (message) => {
     }
 });
 
-// Log in using environment variable TOKEN
 if (!process.env.TOKEN) {
     console.error("Error: TOKEN environment variable is not set!");
-    process.exit(1); // Stop if no token
+    process.exit(1);
 }
 
 client.login(process.env.TOKEN)
